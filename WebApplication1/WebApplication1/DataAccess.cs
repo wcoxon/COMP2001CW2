@@ -10,8 +10,6 @@ namespace WebApplication1
     
     public class DataAccess
     {
-        //private string username;
-        //private byte[] passwordHash;
         private string Connection;
 
         public DataAccess(string connection)
@@ -69,136 +67,85 @@ namespace WebApplication1
             return false;
             
         }
-        public string RegisterUser(User user)//, out string responseMessage)
+        public string RegisterUser(User user)
         {
             //function overload just generates 32 byte salt if salt parameter not assigned
-            return RegisterUser(user, generateSalt(32));//, out responseMessage);
+            return RegisterUser(user, generateSalt(32));
         }
         public string RegisterUser(User user, byte[] salt)//, out string responseMessage)
         {
             //initialise byte array for concatenation of password(plaintext) + salt
-            byte[] saltedPlainPass = new byte[user.Password.Length + salt.Length];
+            byte[] saltedPlainPass = new byte[user.password.Length + salt.Length];
             //convert string password into a byte array and copy it to the salted password byte array
-            Encoding.UTF8.GetBytes(user.Password).CopyTo(saltedPlainPass, 0);
+            Encoding.UTF8.GetBytes(user.password).CopyTo(saltedPlainPass, 0);
             //copy salt byte array into the salted password array onto the end of the password bytes
-            salt.CopyTo(saltedPlainPass, user.Password.Length);
+            salt.CopyTo(saltedPlainPass, user.password.Length);
             //hash the salted plaintext password to create the hashed salted password
             byte[] hashedPass = SHA256.Create().ComputeHash(saltedPlainPass);
 
 
-            SqlConnection cnn = new SqlConnection(Connection);// "Data Source=localhost\\MSSQLSERVER04;Initial Catalog=StockDB;Integrated Security=True");
-                                                              //SqlCommand command = new SqlCommand("INSERT INTO Users VALUES (@FirstName,@LastName, @HashedSaltedPass, @Salt);", cnn);
-
-            //SqlParameter responseParam = new SqlParameter("@ResponseMessage", System.Data.SqlDbType.VarChar, 64);
-            //responseParam.Direction = System.Data.ParameterDirection.Output;
+            SqlConnection cnn = new SqlConnection(Connection);
             SqlCommand command = new SqlCommand("EXEC RegisterUser @FirstName, @LastName, @Email, @HashedPass, @Salt, @Response out", cnn);
 
-            //Console.WriteLine(usernameParam);
-            //string response = "";
-            //string responseText = "";
-            command.Parameters.AddWithValue("@FirstName", user.FirstName);
-            command.Parameters.AddWithValue("@LastName", user.LastName);
-            command.Parameters.AddWithValue("@Email", user.Email);
+            command.Parameters.AddWithValue("@FirstName", user.firstName);
+            command.Parameters.AddWithValue("@LastName", user.lastName);
+            command.Parameters.AddWithValue("@Email", user.email);
             command.Parameters.AddWithValue("@HashedPass", hashedPass);
             command.Parameters.AddWithValue("@Salt", salt);
-            //command.Parameters.Add("@ResponseMessage", System.Data.SqlDbType.VarChar, 64).Direction = System.Data.ParameterDirection.Output;
-            //command.Parameters.AddWithValue("@Response", response);
-            //command.Parameters["@ResponseMessage"].Direction = System.Data.ParameterDirection.Output;
+            
             command.Parameters.Add("@Response", System.Data.SqlDbType.VarChar, 64).Direction = System.Data.ParameterDirection.Output;
             
-            //command.Parameters["@Response"].Direction = System.Data.ParameterDirection.Output;
-            //command.Parameters["@Response"].Direction = System.Data.ParameterDirection.Output;
-            //SqlDataReader sdr = command.ExecuteReader();
             object response;
-            //command.Parameters["@ResponseMessage"].Value = responseText;
-            //response = command.Parameters["@ResponseMessage"].Value = "";
-            //command.Parameters["@Response"].Value="a";
-            //command.par
-
-            //command.Parameters.Add(responseParam);
-
-            //response = command.Parameters["@ResponseMessage"];
+            
             command.Connection.Open();
             command.ExecuteNonQuery();
             response = command.Parameters["@Response"].Value;
-            //response = responseParam.Value;
+            
             command.Connection.Close();
+
             return response.ToString();
-            //return command.Parameters["@Reponse"].Value.ToString();
+            
         }
         public bool Validate(User user)
         {
 
-            SqlConnection cnn;
-            cnn = new SqlConnection(Connection);// "Data Source=localhost\\MSSQLSERVER04;Initial Catalog=StockDB;Integrated Security=True");
+            SqlConnection cnn = new SqlConnection(Connection);
+            //cnn = new SqlConnection(Connection);
 
-            //SqlCommand command = new SqlCommand("SELECT Salt,HashP FROM Users WHERE Username = @UsernameParam", cnn);
-            //SqlCommand command = new SqlCommand("SELECT Username FROM Users WHERE Username = @UsernameParam AND Salt", cnn);
-            SqlCommand command = new SqlCommand("EXEC ValidateUser @Email,@Password", cnn);
-            //Console.WriteLine(usernameParam);
-            command.Parameters.AddWithValue("@Email", user.Email);
-            command.Parameters.AddWithValue("@Password", user.Password);
-            command.Parameters.Add("@Validated", System.Data.SqlDbType.Int).Direction = System.Data.ParameterDirection.ReturnValue;
+            SqlCommand command = new SqlCommand("Validateuser",cnn);
+            command.CommandType = CommandType.StoredProcedure;
 
-            command.Connection.Open();
+            command.Parameters.Add("@Email", SqlDbType.VarChar, 64);
+            command.Parameters["@Email"].Value = user.email;
+
+            command.Parameters.Add("@Password", SqlDbType.VarBinary, 64);
+            command.Parameters["@Password"].Value = Encoding.UTF8.GetBytes(user.password);
+
+            command.Parameters.Add("@Validated", System.Data.SqlDbType.Int);
+            command.Parameters["@Validated"].Direction = System.Data.ParameterDirection.ReturnValue;
+
+            cnn.Open();
             command.ExecuteNonQuery();
-            command.Connection.Close();
-            return (int)command.Parameters["@Validated"].Value==1;
-            //SqlDataReader sdr = command.ExecuteReader();
-            //command.Connection.Close();
-            //sdr.Close();
-            //command.Connection.Close();
-            //Console.WriteLine(sdr.Read());
-            //Console.WriteLine(sd)
-            //byte[] saltbuffer = new byte[32];
-            //byte[] bytebuffer2 = new byte[32];
-            //Console.WriteLine("hey");
-            /*while (sdr.Read())
-            {
-                //sdr.Read();
-                sdr.GetBytes(0, 0, saltbuffer, 0, 32);
-                sdr.GetBytes(1, 0, bytebuffer2, 0, 32);
-                
-                if (compareByteArrays(SHA256WithSalt(user.Password, saltbuffer),bytebuffer2))
-                {
-                    sdr.Close();
-                    command.Connection.Close();
-                    return 1;//sdr.GetInt32(0).ToString();
-                }
-                //return sdr.GetInt32(0).ToString();
-            }
+            
+            bool val = (int)command.Parameters["@Validated"].Value==1;
+            cnn.Close();
 
-            //sdr.Read
-            //command.Connection.Close();
-            sdr.Close();
-            command.Connection.Close();
-            return 0;*/
-            //"SELECT Salt FROM USERS WHERE Username = PARAM"
-            //setPassword(passwordParam);
-            /*if(username == usernameParam)
-            {
-                if (passwordHash == hash(passwordParam))
-                {
-                    log_in();
-                    //return 1;
-                }
-                
-            }*/
-            //return 0;
+            return val;
+            
         }
 
         public void Update( User user,int userID)
         {
             byte[] hashedPass = null;
             byte[] salt = null;
-            if (user.Password != null)
+            if (user.password != null)
             {
                 salt = generateSalt(32);
-                byte[] saltedPlainPass = new byte[user.Password.Length + salt.Length];
+                byte[] saltedPlainPass = new byte[user.password.Length + salt.Length];
                 //convert string password into a byte array and copy it to the salted password byte array
-                Encoding.UTF8.GetBytes(user.Password).CopyTo(saltedPlainPass, 0);
+                Encoding.UTF8.GetBytes(user.password).CopyTo(saltedPlainPass, 0);
                 //copy salt byte array into the salted password array onto the end of the password bytes
-                salt.CopyTo(saltedPlainPass, user.Password.Length);
+                salt.CopyTo(saltedPlainPass, user.password.Length);
                 //hash the salted plaintext password to create the hashed salted password
                 hashedPass = SHA256.Create().ComputeHash(saltedPlainPass);
             }
@@ -207,9 +154,9 @@ namespace WebApplication1
             SqlConnection cnn;
             cnn = new SqlConnection(Connection);
             SqlCommand command = new SqlCommand("EXEC UpdateUser @FirstName,@LastName,@Email,@Password,@Salt,@userID", cnn);
-            command.Parameters.AddWithValue("@FirstName", user.FirstName ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@LastName", user.LastName ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@Email", user.Email ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@FirstName", user.firstName ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@LastName", user.lastName ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Email", user.email ?? (object)DBNull.Value);
 
             command.Parameters.Add("@Password", SqlDbType.Binary, 32);
             command.Parameters["@Password"].Value = hashedPass ?? (object)DBNull.Value;

@@ -10,70 +10,29 @@ using System.IO;
 namespace WebApplication1.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
-    public class UsersController : ControllerBase
+    [Route("api/[controller]")]
+    public class UserController : ControllerBase
     {
         private DataAccess Database;
         
-        private readonly ILogger<UsersController> _logger;
+        private readonly ILogger<UserController> _logger;
 
-        public UsersController(ILogger<UsersController> logger) 
+        public UserController(ILogger<UserController> logger) 
         {
             Database = new DataAccess("Data Source=localhost;Initial Catalog=UsersDB;Integrated Security=True");
             _logger = logger;
         }
 
         [HttpGet]
-        public IActionResult Get()
+        public IActionResult Get(User user)
         {
 
-            //System.IO.Pipelines.PipeReader reader = Request.BodyReader;
-            //Request.BodyReader
-            //reader.ReadAsync();
-            //reader.
-            //int x = 0;
-            Stream body = Request.Body;
+            bool Validated = Database.Validate(user);
 
-            //Request.
-            //Request.content
-            //Request.in
-            StreamReader reader = new StreamReader(body);
-            List<byte> content = new List<byte>();
-            
-            string test = reader.ReadToEnd();
-
-            /*int y = body.ReadByte();
-            while (y!=-1)
-            {
-                x += 1;
-                
-                content.Add(Convert.ToByte(y));
-
-            }*/
-
-            //byte[] buffer = new byte[body.Length];
-            //Request.Body.
-            /*for (int x = body.ReadByte(); x != -1; x = body.ReadByte())
-            {
-                content.Add(Convert.ToByte(body.ReadByte()));
-            }*/
-            return Ok(test);
+            return Ok(Validated);
         }
         
-        /*public IActionResult Get2()
-        {
-            string test = this.HttpContext.Request.Headers["Authorization"];
-            return Ok(test);
-            //return Ok();
-
-            //System.Diagnostics.Debug.WriteLine("HEY THIS IS WHERE IT LOGS IT");
-            //User user = new User();
-            //user.FirstName = "bill";
-            //user.Password = "password";
-            //Database = new DataAccess("Data Source=localhost\\MSSQLSERVER04;Initial Catalog=StockDB;Integrated Security=True");
-            
-            
-        }*/
+        
         [HttpDelete("{userID}")]
         public IActionResult Delete(int userID)
         {
@@ -81,12 +40,14 @@ namespace WebApplication1.Controllers
             Database.Delete(userID);
             return Ok();
         }
+
         [HttpPut("{userID}")]
         public IActionResult Put(int userID, User user)
         {
             Database.Update(user, userID);
             return Ok();
         }
+
         [HttpPost]
         public IActionResult Post(User user)
         {

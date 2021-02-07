@@ -19,43 +19,20 @@ namespace WebApplication1.Controllers
 
         public UserController(ILogger<UserController> logger) 
         {
-            Database = new DataAccess("Data Source=localhost;Initial Catalog=UsersDB;Integrated Security=True");
-            _logger = logger;
-        }
-
-        [HttpGet]
-        public IActionResult Get(User user)
-        {
-
-            bool Validated = Database.Validate(user);
-
-            return Ok(Validated);
-        }
-        
-        
-        [HttpDelete("{userID}")]
-        public IActionResult Delete(int userID)
-        {
             
-            Database.Delete(userID);
-            return Ok();
-        }
-
-        [HttpPut("{userID}")]
-        public IActionResult Put(int userID, User user)
-        {
-            Database.Update(user, userID);
-            return Ok();
+            Database = new DataAccess("Data Source=socem1.uopnet.plymouth.ac.uk;Database=COMP2001_WCoxon;User Id=WCoxon;Password=UgmH957*");
+            _logger = logger;
         }
 
         [HttpPost]
         public IActionResult Post(User user)
         {
-            
-            string response = Database.RegisterUser(user);
-            
+            //attempt to register the user credentials provided in the POST request
+            string response = Database.Register(user);
+
             string[] responseArgs = response.Split(",");
-            if (responseArgs.Length == 2)
+
+            if (responseArgs[0] == "200")
             {
                 return Ok(Int32.Parse(responseArgs[1]));
             }
@@ -63,7 +40,32 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest();
             }
-            
+
         }
+
+        [HttpGet]
+        public IActionResult Get(User user)
+        {
+            //attempt to validate the user credentials provided in the GET request
+            bool Validated = Database.Validate(user);
+            return Ok(Validated);
+        }
+
+        [HttpPut("{userID}")]
+        public IActionResult Put(int userID, User user)
+        {
+            //attempt to update the user with the ID provided in the url, using the credentials provided in the PUT request
+            Database.Update(user, userID);
+            return Ok();
+        }
+
+        [HttpDelete("{userID}")]
+        public IActionResult Delete(int userID)
+        {
+            //attempt to delete the user with the ID provided in the url
+            Database.Delete(userID);
+            return Ok();
+        }
+
     }
 }

@@ -10,175 +10,159 @@ namespace WebApplication1
     
     public class DataAccess
     {
-        private string Connection;
+        private string ConnectionString;
 
-        public DataAccess(string connection)
+        public DataAccess(string connectionString)
         {
-            Connection = connection;
-            
+            ConnectionString = connectionString;
         }
         
-        public byte[] hash(string arg)
-        {
-            return new Rfc2898DeriveBytes(arg, 32, 100).GetBytes(32);
-        }
-
-        public byte[] SHA256WithSalt(string password,byte[] salt)
-        {
-            //initialise byte array for concatenation of password(plaintext) + salt
-            byte[] saltedPlainPass = new byte[password.Length + salt.Length];
-            //convert string password into a byte array and copy it to the salted password byte array
-            Encoding.UTF8.GetBytes(password).CopyTo(saltedPlainPass, 0);
-            //copy salt byte array into the salted password array onto the end of the password bytes
-            salt.CopyTo(saltedPlainPass, password.Length);
-            //hash the salted plaintext password to create the hashed salted password
-            byte[] hashedSaltedPass = SHA256.Create().ComputeHash(saltedPlainPass);
-            return hashedSaltedPass;
-        }
-        public void changePassword()
-        {
-            //probably change salt aswell
-            //just go into the table, we may want some kind of identifier for authentication other than username
-            //query for where the username and password are in there, then generate salt and hash the plaintext arg also given, and then replace the shit in there with the new stuff
-            //later we want a table of old passwords, among other reasons so people can't juke the system by going back and forth between the same passwords
-        }
         public byte[] generateSalt(int bytes)
         {
-
+            //generates a random salt value. bytes parameter represents the length of the salt being generated
             byte[] salt = new byte[bytes];
             RNGCryptoServiceProvider rand = new RNGCryptoServiceProvider();
             rand.GetNonZeroBytes(salt);
 
             return salt;
         }
-        public bool compareByteArrays(byte[] array1, byte[] array2)
+        
+        public byte[] SaltAndHash(string password,byte[] salt)
         {
-            if (array1.Length == array2.Length)
-            {
-                for(int x = 0; x< array1.Length;x++){
-                    if (array1[x] != array2[x])
-                    {
-                        return false;
-                    }
+            //this function creates a byte array buffer, which it uses to concatenate the password string's bytes and the salt
+            //once the password is salted, the bytes are hashed using SHA256, and the hash is returned
+            byte[] saltedPassword = new byte[password.Length + salt.Length];
+            Encoding.UTF8.GetBytes(password).CopyTo(saltedPassword, 0);
+            salt.CopyTo(saltedPassword, password.Length);
 
-                }
-                return true;
-            }
-            return false;
-            
+            return SHA256.Create().ComputeHash(saltedPassword);
         }
-        public string RegisterUser(User user)
+
+        public string Register(User user)
         {
-            //function overload just generates 32 byte salt if salt parameter not assigned
-            return RegisterUser(user, generateSalt(32));
-        }
-        public string RegisterUser(User user, byte[] salt)//, out string responseMessage)
-        {
-            //initialise byte array for concatenation of password(plaintext) + salt
-            byte[] saltedPlainPass = new byte[user.password.Length + salt.Length];
-            //convert string password into a byte array and copy it to the salted password byte array
-            Encoding.UTF8.GetBytes(user.password).CopyTo(saltedPlainPass, 0);
-            //copy salt byte array into the salted password array onto the end of the password bytes
-            salt.CopyTo(saltedPlainPass, user.password.Length);
-            //hash the salted plaintext password to create the hashed salted password
-            byte[] hashedPass = SHA256.Create().ComputeHash(saltedPlainPass);
+            string responseMessage;
 
+            byte[] salt = generateSalt(32);
+            byte[] hashedPass = SaltAndHash(user.password, salt);
 
-            SqlConnection cnn = new SqlConnection(Connection);
-            SqlCommand command = new SqlCommand("EXEC RegisterUser @FirstName, @LastName, @Email, @HashedPass, @Salt, @Response out", cnn);
-
-            command.Parameters.AddWithValue("@FirstName", user.firstName);
-            command.Parameters.AddWithValue("@LastName", user.lastName);
-            command.Parameters.AddWithValue("@Email", user.email);
-            command.Parameters.AddWithValue("@HashedPass", hashedPass);
-            command.Parameters.AddWithValue("@Salt", salt);
-            
-            command.Parameters.Add("@Response", System.Data.SqlDbType.VarChar, 64).Direction = System.Data.ParameterDirection.Output;
-            
-            object response;
-            
-            command.Connection.Open();
-            command.ExecuteNonQuery();
-            response = command.Parameters["@Response"].Value;
-            
-            command.Connection.Close();
-
-            return response.ToString();
-            
-        }
-        public bool Validate(User user)
-        {
-
-            SqlConnection cnn = new SqlConnection(Connection);
-            //cnn = new SqlConnection(Connection);
-
-            SqlCommand command = new SqlCommand("Validateuser",cnn);
+            //create the connection and command. the command executes a stored procedure.
+            SqlConnection connection = new SqlConnection(ConnectionString);
+            SqlCommand command = new SqlCommand("RegisterUser", connection);
             command.CommandType = CommandType.StoredProcedure;
 
+            //add the parameters to the command
+            command.Parameters.Add("@FirstName",SqlDbType.VarChar,32);
+            command.Parameters.Add("@LastName", SqlDbType.VarChar, 32);
             command.Parameters.Add("@Email", SqlDbType.VarChar, 64);
+            command.Parameters.Add("@Password", SqlDbType.Binary, 32);
+            command.Parameters.Add("@Salt", SqlDbType.Binary, 32);
+            command.Parameters.Add("@ResponseMessage", System.Data.SqlDbType.VarChar, 64);
+
+            //assign values to the command's parameters
+            command.Parameters["@FirstName"].Value = user.firstName;
+            command.Parameters["@LastName"].Value = user.lastName;
             command.Parameters["@Email"].Value = user.email;
+            command.Parameters["@Password"].Value = hashedPass;
+            command.Parameters["@Salt"].Value = salt;
+            command.Parameters["@ResponseMessage"].Direction = System.Data.ParameterDirection.Output;
 
+            connection.Open();
+            command.ExecuteNonQuery();
+            //set responseMessage to the string value of the output parameter in the RegisterUser procedure.
+            responseMessage = command.Parameters["@ResponseMessage"].Value.ToString();
+
+            connection.Close();
+
+            //returns the response message after obtaining the value from the database
+            return responseMessage;
+        }
+
+        public bool Validate(User user)
+        {
+            bool Validated;
+
+            //create the connection and command. the command executes a stored procedure.
+            SqlConnection connection = new SqlConnection(ConnectionString);
+            SqlCommand command = new SqlCommand("ValidateUser",connection);
+            command.CommandType = CommandType.StoredProcedure;
+
+            //add the parameters to the command
+            command.Parameters.Add("@Email", SqlDbType.VarChar, 64);
             command.Parameters.Add("@Password", SqlDbType.VarBinary, 64);
-            command.Parameters["@Password"].Value = Encoding.UTF8.GetBytes(user.password);
-
             command.Parameters.Add("@Validated", System.Data.SqlDbType.Int);
+
+            //assign values to the command's parameters
+            command.Parameters["@Email"].Value = user.email;
+            command.Parameters["@Password"].Value = Encoding.UTF8.GetBytes(user.password);
             command.Parameters["@Validated"].Direction = System.Data.ParameterDirection.ReturnValue;
 
-            cnn.Open();
+            connection.Open();
             command.ExecuteNonQuery();
-            
-            bool val = (int)command.Parameters["@Validated"].Value==1;
-            cnn.Close();
+            //get the return value in the form of a boolean, when the return is 1, return==1 is true
+            //this result determines whether the user credentials are valid or not.
+            Validated = (int)command.Parameters["@Validated"].Value==1;
 
-            return val;
-            
+            connection.Close();
+
+            //returns the validation status after obtaining the value from the database
+            return Validated;
         }
 
         public void Update( User user,int userID)
         {
-            byte[] hashedPass = null;
             byte[] salt = null;
+            byte[] passwordBytes = null;
+
             if (user.password != null)
             {
                 salt = generateSalt(32);
-                byte[] saltedPlainPass = new byte[user.password.Length + salt.Length];
-                //convert string password into a byte array and copy it to the salted password byte array
-                Encoding.UTF8.GetBytes(user.password).CopyTo(saltedPlainPass, 0);
-                //copy salt byte array into the salted password array onto the end of the password bytes
-                salt.CopyTo(saltedPlainPass, user.password.Length);
-                //hash the salted plaintext password to create the hashed salted password
-                hashedPass = SHA256.Create().ComputeHash(saltedPlainPass);
+                passwordBytes = Encoding.UTF8.GetBytes(user.password);
             }
 
+            //create the connection and command. the command executes a stored procedure.
+            SqlConnection connection = new SqlConnection(ConnectionString);
+            SqlCommand command = new SqlCommand("UpdateUser", connection);
+            command.CommandType = CommandType.StoredProcedure;
 
-            SqlConnection cnn;
-            cnn = new SqlConnection(Connection);
-            SqlCommand command = new SqlCommand("EXEC UpdateUser @FirstName,@LastName,@Email,@Password,@Salt,@userID", cnn);
-            command.Parameters.AddWithValue("@FirstName", user.firstName ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@LastName", user.lastName ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@Email", user.email ?? (object)DBNull.Value);
-
-            command.Parameters.Add("@Password", SqlDbType.Binary, 32);
-            command.Parameters["@Password"].Value = hashedPass ?? (object)DBNull.Value;
-
+            //add the parameters to the command
+            command.Parameters.Add("@FirstName", SqlDbType.VarChar,32);
+            command.Parameters.Add("@LastName", SqlDbType.VarChar, 32);
+            command.Parameters.Add("@Email", SqlDbType.VarChar, 64);
+            command.Parameters.Add("@Password", SqlDbType.VarBinary, 64);
             command.Parameters.Add("@Salt", SqlDbType.Binary, 32);
+            command.Parameters.Add("@id", SqlDbType.Int);
+
+            //assign values to the command's parameters
+            command.Parameters["@FirstName"].Value = user.firstName ?? (object)DBNull.Value;
+            command.Parameters["@LastName"].Value = user.lastName ?? (object)DBNull.Value;
+            command.Parameters["@Email"].Value = user.email ?? (object)DBNull.Value;
+            command.Parameters["@Password"].Value = passwordBytes ?? (object)DBNull.Value;
             command.Parameters["@Salt"].Value = salt ?? (object)DBNull.Value;
+            command.Parameters["@id"].Value = userID;
 
-            command.Parameters.AddWithValue("@userID", userID);
-
-            cnn.Open();
+            //open the connection momentarily to execute the stored procedure
+            connection.Open();
             command.ExecuteNonQuery();
-            cnn.Close();
+            connection.Close();
         }
+
         public void Delete(int userID)
         {
-            SqlConnection cnn;
-            cnn = new SqlConnection(Connection);
-            SqlCommand command = new SqlCommand("EXEC DeleteUser @userID", cnn);
-            command.Parameters.AddWithValue("@userID", userID);
-            cnn.Open();
+            //create the connection and command. the command executes a stored procedure.
+            SqlConnection connection = new SqlConnection(ConnectionString);
+            SqlCommand command = new SqlCommand("DeleteUser", connection);
+            command.CommandType = CommandType.StoredProcedure;
+
+            //add the parameter to the command
+            command.Parameters.Add("@id", SqlDbType.Int);
+
+            //assign value to the command's parameter
+            command.Parameters["@id"].Value = userID;
+
+            //open the connection momentarily to execute the stored procedure
+            connection.Open();
             command.ExecuteNonQuery();
-            cnn.Close();
+            connection.Close();
         }
 
     }

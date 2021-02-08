@@ -1,0 +1,46 @@
+
+*{
+    font-family:Arial;
+}
+
+
+
+table {
+    height: inherit;
+    width: fit-content;
+    background: #777777;
+    border-radius: 5px;
+}
+
+
+th {
+    padding:10px;
+    text-align: center;
+    font-size: 25px;
+    font-weight:100;
+    width: auto;
+    height: fit-content;
+    border-radius: 2px;
+    background: #bbbbee;
+}
+
+
+
+
+td {
+    padding: 10px;
+    text-align: center;
+    font-size: 15px;
+    border-radius: 4px;
+    
+    width: auto;
+    height: auto;
+    
+    background: #eeeeee;
+    transition-duration: 0.2s;
+}
+
+tr:hover td {
+    cursor:pointer;
+    background: #dddddd;
+}
